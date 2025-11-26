@@ -84,6 +84,70 @@ class YoutubeDownloader:
             print(f"An unexpected error occurred: {str(e)}")
         return None
 
+    def download_audio(self, url, output_path=None):
+        """
+        Download only the audio from a YouTube video as MP3.
+        
+        Args:
+            url: YouTube video URL
+            output_path: Optional path for output file. If None, uses video title.
+        
+        Returns:
+            Path to downloaded audio file, or None if failed
+        """
+        try:
+            yt = YouTube(url)
+            print(f"Title: {yt.title}")
+            print(f"Views: {yt.views}")
+            
+            # Get the highest quality audio stream
+            audio_stream = yt.streams.filter(only_audio=True).order_by('abr').desc().first()
+            
+            if not audio_stream:
+                print("No audio stream found")
+                return None
+            
+            print(f"Selected audio bitrate: {audio_stream.abr}")
+            
+            # Download audio
+            print("Downloading audio...")
+            audio_file = audio_stream.download(filename_prefix="audio_")
+            
+            # Convert to MP3 using ffmpeg
+            if output_path is None:
+                output_file = f"{yt.title.replace('/', '_').replace('|', '_')}.mp3"
+            else:
+                output_file = output_path
+            
+            print("Converting to MP3...")
+            ffmpeg_command = [
+                "ffmpeg",
+                "-i", audio_file,
+                "-vn",  # No video
+                "-acodec", "libmp3lame",  # MP3 codec
+                "-ab", "192k",  # Audio bitrate
+                "-ar", "44100",  # Sample rate
+                "-y",  # Overwrite output file
+                output_file
+            ]
+            
+            subprocess.run(ffmpeg_command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+            # Remove temporary file
+            os.remove(audio_file)
+            
+            print(f"Audio downloaded successfully: {output_file}")
+            return output_file
+            
+        except pytubefix.exceptions.PytubeError as e:
+            print(f"An error occurred: {str(e)}")
+        except subprocess.CalledProcessError as e:
+            print(f"An error occurred while running ffmpeg: {str(e)}")
+        except Exception as e:
+            print(f"An unexpected error occurred: {str(e)}")
+        return None
+
 # Usage example:
 # yt_downloader = YoutubeDownloader()
 # yt_downloader.download(url, start_time="00:01:30", end_time="00:03:45")
+# yt_downloader.download_audio(url, "output.mp3")
